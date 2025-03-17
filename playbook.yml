@@ -1,0 +1,77 @@
+---
+- name: Installer Asterisk depuis les sources
+  hosts: hosts
+  become: true
+  vars:
+    dependencies:
+      - build-essential
+      - bison
+      - flex
+      - libncurses5-dev
+      - libjansson-dev
+      - libxml2-dev
+      - uuid-dev
+      - libsqlite3-dev
+      - libssl-dev
+      - wget
+      - git
+      - sox
+      - libspeexdsp-dev
+      - libvorbis-dev
+      - libgsm1-dev
+      - libopus-dev
+      - libcurl4-openssl-dev
+      - pkg-config
+      - libnewt-dev
+
+  tasks:
+    - name: Mettre à jour la liste des paquets
+      apt:
+        update_cache: yes
+
+    - name: Installer les dépendances nécessaires
+      apt:
+        name: "{{ dependencies }}"
+        state: present
+
+    - name: Créer le répertoire pour les sources d'Asterisk
+      file:
+        path: /usr/src/asterisk
+        state: directory
+
+    - name: Télécharger les sources d'Asterisk
+      get_url:
+        url: "https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-22-current.tar.gz"
+        dest: /usr/src/asterisk/
+
+    - name: Extraire les sources d'Asterisk
+      command: "tar -zxvf asterisk-22-current.tar.gz"
+      args:
+        chdir: /usr/src/asterisk/
+        creates: "/usr/src/asterisk/asterisk-22-current"
+
+    - name: Compiler Asterisk
+      command: "make -j $(nproc)"
+      args:
+        chdir: "/usr/src/asterisk/asterisk-22-current"
+
+    - name: Installer Asterisk
+      command: "make install"
+      args:
+        chdir: "/usr/src/asterisk/asterisk-22-current"
+
+    - name: Installer les exemples de configurations
+      command: "make samples"
+      args:
+        chdir: "/usr/src/asterisk/asterisk-22-current"
+
+    - name: Installer les scripts d'initialisation
+      command: "make config"
+      args:
+        chdir: "/usr/src/asterisk/asterisk-22-current"
+
+    - name: Activer et démarrer le service Asterisk
+      systemd:
+        name: asterisk
+        enabled: yes
+        state: started
