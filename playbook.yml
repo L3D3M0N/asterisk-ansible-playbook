@@ -1,13 +1,13 @@
 ---
-- name: Mise à jour d'Asterisk - Méthode non-interactive
+- name: Mise à jour d'Asterisk
   hosts: asterisk_servers
   become: yes
   vars:
     asterisk_version: 22.2.0
-    install_dir: /usr/src/asterisk
+    install_asterisk: /usr/src/asterisk
 
   tasks:
-    - name: Installation des dépendances système
+    - name: Installation des dépendances
       apt:
         name:
           - build-essential
@@ -22,9 +22,9 @@
         state: present
         update_cache: yes
 
-    - name: Création du répertoire d'installation
+    - name: Répertoire d'installation
       file:
-        path: "{{ install_dir }}"
+        path: "{{ install_asterisk }}"
         state: directory
 
     - name: Téléchargement des sources Asterisk
@@ -35,23 +35,23 @@
     - name: Extraction de l'archive
       unarchive:
         src: "/tmp/asterisk-{{ asterisk_version }}.tar.gz"
-        dest: "{{ install_dir }}"
+        dest: "{{ install_asterisk }}"
         remote_src: yes
 
     - name: Configuration de la compilation
       command: ./configure
       args:
-        chdir: "{{ install_dir }}/asterisk-{{ asterisk_version }}"
+        chdir: "{{ install_asterisk }}/asterisk-{{ asterisk_version }}"
 
     - name: Compilation des modules (configuration non-interactive)
       command: make menuselect.makeopts
       args:
-        chdir: "{{ install_dir }}/asterisk-{{ asterisk_version }}"
+        chdir: "{{ install_asterisk }}/asterisk-{{ asterisk_version }}"
 
     - name: Compilation et installation
       command:
         cmd: make -j4 install
-        chdir: "{{ install_dir }}/asterisk-{{ asterisk_version }}"
+        chdir: "{{ install_asterisk }}/asterisk-{{ asterisk_version }}"
       become: yes
 
     - name: Configuration des modules essentiels
