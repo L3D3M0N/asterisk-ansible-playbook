@@ -1,77 +1,77 @@
 ---
-- name: Installer Asterisk depuis les sources
-  hosts: hosts
-  become: true
+- name: Mise à jour d'Asterisk - Méthode non-interactive
+  hosts: asterisk_servers
+  become: yes
   vars:
-    dependencies:
-      - build-essential
-      - bison
-      - flex
-      - libncurses5-dev
-      - libjansson-dev
-      - libxml2-dev
-      - uuid-dev
-      - libsqlite3-dev
-      - libssl-dev
-      - wget
-      - git
-      - sox
-      - libspeexdsp-dev
-      - libvorbis-dev
-      - libgsm1-dev
-      - libopus-dev
-      - libcurl4-openssl-dev
-      - pkg-config
-      - libnewt-dev
+    asterisk_version: 22.2.0
+    install_dir: /usr/src/asterisk
 
   tasks:
-    - name: Mettre à jour la liste des paquets
+    - name: Installation des dépendances système
       apt:
+        name:
+          - build-essential
+          - libssl-dev
+          - libncurses5-dev
+          - libnewt-dev
+          - libxml2-dev
+          - libsqlite3-dev
+          - libjansson-dev
+          - uuid-dev
+          - libxslt1-dev
+        state: present
         update_cache: yes
 
-    - name: Installer les dépendances nécessaires
-      apt:
-        name: "{{ dependencies }}"
-        state: present
-
-    - name: Créer le répertoire pour les sources d'Asterisk
+    - name: Création du répertoire d'installation
       file:
-        path: /usr/src/asterisk
+        path: "{{ install_dir }}"
         state: directory
 
-    - name: Télécharger les sources d'Asterisk
+    - name: Téléchargement des sources Asterisk
       get_url:
-        url: "https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-22-current.tar.gz"
-        dest: /usr/src/asterisk/
+        url: https://github.com/asterisk/asterisk/archive/refs/tags/{{ asterisk_version }}.tar.gz
+        dest: "/tmp/asterisk-{{ asterisk_version }}.tar.gz"
 
-    - name: Extraire les sources d'Asterisk
-      command: "tar -zxvf asterisk-22-current.tar.gz"
+    - name: Extraction de l'archive
+      unarchive:
+        src: "/tmp/asterisk-{{ asterisk_version }}.tar.gz"
+        dest: "{{ install_dir }}"
+        remote_src: yes
+
+    - name: Configuration de la compilation
+      command: ./configure
       args:
-        chdir: /usr/src/asterisk/
-        creates: "/usr/src/asterisk/asterisk-22-current"
+        chdir: "{{ install_dir }}/asterisk-{{ asterisk_version }}"
 
-    - name: Compiler Asterisk
-      command: "make -j $(nproc)"
+    - name: Compilation des modules (configuration non-interactive)
+      command: make menuselect.makeopts
       args:
-        chdir: "/usr/src/asterisk/asterisk-22-current"
+        chdir: "{{ install_dir }}/asterisk-{{ asterisk_version }}"
 
-    - name: Installer Asterisk
-      command: "make install"
-      args:
-        chdir: "/usr/src/asterisk/asterisk-22-current"
+    - name: Compilation et installation
+      command:
+        cmd: make -j4 install
+        chdir: "{{ install_dir }}/asterisk-{{ asterisk_version }}"
+      become: yes
 
-    - name: Installer les exemples de configurations
-      command: "make samples"
-      args:
-        chdir: "/usr/src/asterisk/asterisk-22-current"
+    - name: Configuration des modules essentiels
+      copy:
+        content: |
+          [modules]
+          autoload=yes
+          noload => chan_sip.so
+          load => chan_pjsip.so
+        dest: /etc/asterisk/modules.conf
+      notify: redemarrer_asterisk
 
-    - name: Installer les scripts d'initialisation
-      command: "make config"
-      args:
-        chdir: "/usr/src/asterisk/asterisk-22-current"
+    - name: Configuration PJSIP de base
+      template:
+        src: templates/pjsip.conf.j2
+        dest: /etc/asterisk/pjsip.conf
 
-    - name: Activer et démarrer le service Asterisk
+  handlers:
+    - name: redemarrer_asterisk
       systemd:
         name: asterisk
+        state: restarted
         enabled: yes
-        state: started
