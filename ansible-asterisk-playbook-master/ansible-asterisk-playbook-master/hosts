@@ -1,2 +1,0 @@
-[asterisk_servers]
-10.211.55.12 ansible_user=simon ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_become=true ansible_become_method=sudo
