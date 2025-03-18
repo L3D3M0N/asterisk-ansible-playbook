@@ -1,0 +1,11 @@
+[transport-udp]
+type=transport
+protocol=udp
+bind=0.0.0.0
+
+[endpoint-basic]
+type=endpoint
+transport=transport-udp
+context=default
+disallow=all
+allow=ulaw
